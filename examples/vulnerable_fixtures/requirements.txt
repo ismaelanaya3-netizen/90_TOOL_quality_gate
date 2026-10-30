@@ -1,0 +1,3 @@
+fastapi==0.141.1
+requests
+PyYAML>=6.0

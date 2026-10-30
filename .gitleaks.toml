@@ -1,0 +1,13 @@
+# Configuración de gitleaks para el repositorio del kit (uso directo: gitleaks dir .).
+# qgate genera su propia configuración a partir de [secretos].excluir de qgate.toml;
+# este archivo replica la misma exclusión para quien ejecute gitleaks a mano o en CI.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fixtures deliberadamente inseguros con un token FALSO (ver examples/vulnerable_fixtures/README.md)"
+paths = [
+  '''(^|[/\\])examples[/\\]vulnerable_fixtures[/\\]''',
+  '''(^|[/\\])\.venv[/\\]''',
+  '''(^|[/\\])\.qgate[/\\]''',
+]

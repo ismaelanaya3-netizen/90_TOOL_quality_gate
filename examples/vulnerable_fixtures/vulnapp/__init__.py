@@ -1,0 +1,1 @@
+"""INTENTIONALLY VULNERABLE TEST FIXTURE. Never import or deploy."""

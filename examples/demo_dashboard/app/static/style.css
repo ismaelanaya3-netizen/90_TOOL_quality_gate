@@ -1,0 +1,6 @@
+body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; background: #f7f8fa; color: #1d2330; }
+main { max-width: 760px; margin: 0 auto; padding: 16px; }
+nav a { margin-right: 12px; }
+nav a[aria-current="page"] { font-weight: 700; }
+svg { width: 100%; height: auto; background: #fff; border: 1px solid #d9dde4; border-radius: 8px; }
+.line { fill: none; stroke: #0b6e99; stroke-width: 2; }

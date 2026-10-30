@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body>
+  <main>
+    <h1>Serie de tiempo — {{ selected or "sin datos" }}</h1>
+    <nav>
+      {% for code in stations %}
+        <a href="?station={{ code }}" {% if code == selected %}aria-current="page"{% endif %}>{{ code }}</a>
+      {% endfor %}
+    </nav>
+    {% if count %}
+      <svg viewBox="0 0 {{ width }} {{ height }}" role="img" aria-label="Últimos 7 días de {{ selected }}">
+        <polyline points="{{ points }}" class="line"/>
+      </svg>
+      <p>{{ count }} puntos · último valor: {{ "%.2f"|format(last_value) }}</p>
+    {% else %}
+      <p>No hay datos para mostrar.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

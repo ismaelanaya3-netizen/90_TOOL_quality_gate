@@ -1,0 +1,41 @@
+# Configuración qgate del dashboard de demostración.
+
+[proyecto]
+nombre = "demo_dashboard"
+src = ["app"]
+pruebas = "tests"
+app_module = "app.main:app"
+excluir = []
+
+[entorno]
+python_objetivo = "3.12"
+python_ejecutable = ""
+estricto_version = true
+
+[checks]
+perfil = "strict"
+
+[cobertura]
+criticos = ["app/security.py", "app/repository.py", "app/db.py"]
+
+[dependencias]
+archivos = ["requirements.txt"]
+# requirements.txt contiene el árbol completo fijado: no hace falta resolver transitivas.
+auditar_transitivas = false
+
+[fastapi]
+permitir_docs = false
+ruta_salud = "/health"
+rutas_html = ["/"]
+entorno_produccion = { APP_ENV = "production", APP_ALLOWED_HOSTS = '["127.0.0.1", "localhost"]' }
+
+[http]
+tam_max_request_kb = 1024
+
+[api]
+max_ejemplos = 30
+
+[carga]
+usuarios = 20
+duracion_s = 30
+rutas = ["/health", "/api/series?station=MED-01&start=2026-01-01&end=2026-01-07"]

@@ -1,0 +1,13 @@
+# Fixtures vulnerables: el gate DEBE fallar aquí.
+[proyecto]
+nombre = "vulnerable_fixtures"
+src = ["vulnapp"]
+pruebas = "tests"
+app_module = ""
+
+[entorno]
+python_objetivo = "3.12"
+
+[dependencias]
+archivos = ["requirements.txt"]
+auditar_transitivas = false

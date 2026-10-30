@@ -1,0 +1,19 @@
+# Hooks del Quality Gate Kit: 'fast' en cada commit y 'standard' antes de cada push.
+# Instalación: pre-commit install --hook-type pre-commit --hook-type pre-push
+repos:
+  - repo: local
+    hooks:
+      - id: qgate-fast
+        name: qgate (fast)
+        entry: qgate run --level fast
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: qgate-standard
+        name: qgate (standard)
+        entry: qgate run --level standard
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

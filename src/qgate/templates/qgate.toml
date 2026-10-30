@@ -1,0 +1,61 @@
+# Configuración del Quality Gate Kit (qgate). Documentación: README.md del kit.
+
+[proyecto]
+nombre = "@@NAME@@"
+src = ["@@SRC@@"]                 # paquetes de la aplicación (bandit, mypy, cobertura, semgrep)
+pruebas = "tests"
+app_module = "@@APP_MODULE@@"     # módulo:objeto ASGI para los checks full ("" si no aplica)
+excluir = ["release/**", "runtime/**"]   # globs POSIX relativos a la raíz
+
+[entorno]
+python_objetivo = "@@PYTHON@@"    # major.minor. Precedencia: --python > QGATE_PYTHON_OBJETIVO > este valor > 3.12
+python_ejecutable = ""            # opcional, p. ej. "C:\\Python312\\python.exe" o ".venv\\Scripts\\python.exe"
+estricto_version = true           # desalineación: true = FAIL en CI y WARN en local
+
+[checks]
+perfil = "strict"
+desactivados = []                 # ids de checks a no ejecutar (quedan visibles como omitidos no obligatorios)
+opcionales = []                   # ids cuyo SKIPPED no se convierte en FAIL en CI
+
+[cobertura]
+criticos = ["@@SRC@@/auth*.py", "@@SRC@@/security*.py", "@@SRC@@/db*.py", "@@SRC@@/repositor*.py"]
+
+[dependencias]
+archivos = ["requirements.txt"]
+auditar_transitivas = true        # false = solo lo fijado en el archivo (más rápido, sin resolver)
+servicio = "pypi"                 # pypi u osv
+
+[licencias]
+# denegadas = ["\\bAGPL", "(?<![L])GPL"]   # regex; por defecto GPL/AGPL (LGPL permitida)
+permitir_paquetes = []
+
+[secretos]
+excluir = []
+
+[semgrep]
+reglas_extra = []                 # carpetas o archivos .yml propios del proyecto
+rulesets_publicos = ["p/python", "p/owasp-top-ten"]   # solo si hay acceso a semgrep.dev
+
+[fastapi]
+permitir_docs = false
+ruta_salud = "/health"
+rutas_html = ["/"]
+# Variables con las que se importa/levanta la app en modo producción para los checks
+entorno_produccion = { APP_ENV = "production" }
+
+[http]
+tam_max_request_kb = 1024
+
+[carga]
+usuarios = 20
+duracion_s = 30
+rutas = ["/health"]
+
+[zap]
+imagen = "ghcr.io/zaproxy/zaproxy:stable"
+
+# Perfiles: strict (por defecto) y baseline vienen incluidos. Para alinear con TI:
+# [perfiles.epm_ti]
+# hereda = "baseline"
+# cobertura_total = 80
+# mypy_errores = "no_exigido"

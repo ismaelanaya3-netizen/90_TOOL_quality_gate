@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "qgate: fast",
+      "type": "process",
+      "command": "qgate",
+      "args": ["run", "--level", "fast"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "qgate: standard",
+      "type": "process",
+      "command": "qgate",
+      "args": ["run", "--level", "standard"],
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "qgate: full",
+      "type": "process",
+      "command": "qgate",
+      "args": ["run", "--level", "full"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "qgate: abrir informe",
+      "type": "process",
+      "command": "qgate",
+      "args": ["report", "--open"],
+      "problemMatcher": []
+    },
+    {
+      "label": "qgate: doctor",
+      "type": "process",
+      "command": "qgate",
+      "args": ["doctor"],
+      "problemMatcher": []
+    }
+  ]
+}

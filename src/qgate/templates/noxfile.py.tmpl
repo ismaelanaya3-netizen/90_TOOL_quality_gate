@@ -1,0 +1,20 @@
+"""Sesiones nox que delegan en qgate (fast, standard, full)."""
+
+import nox
+
+nox.options.default_venv_backend = "none"
+
+
+@nox.session
+def fast(session: nox.Session) -> None:
+    session.run("qgate", "run", "--level", "fast", *session.posargs)
+
+
+@nox.session
+def standard(session: nox.Session) -> None:
+    session.run("qgate", "run", "--level", "standard", *session.posargs)
+
+
+@nox.session
+def full(session: nox.Session) -> None:
+    session.run("qgate", "run", "--level", "full", *session.posargs)

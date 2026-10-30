@@ -1,0 +1,12 @@
+# Registro auditable de excepciones del Quality Gate.
+# Cada excepción requiere justificación, responsable y vencimiento (máximo 180 días).
+# Una excepción vencida hace que el hallazgo vuelva a contar y el gate FALLE.
+#
+# [[excepcion]]
+# regla = "B608"                       # id de la regla (admite comodines: "B6*")
+# herramienta = "bandit"               # opcional: limita a una herramienta
+# archivo = "app/reports/*.py"         # glob POSIX relativo a la raíz
+# justificacion = "Consulta construida con columnas de una lista blanca fija; sin entrada de usuario."
+# responsable = "Nombre Apellido"
+# creada = 2026-01-15
+# vence = 2026-06-30

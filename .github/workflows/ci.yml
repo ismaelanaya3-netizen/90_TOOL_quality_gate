@@ -20,8 +20,8 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         python: ["3.10", "3.12"]
     env:
-      # La versión objetivo del kit sigue a la del job (ver qgate.toml del kit).
-      QGATE_PYTHON_OBJETIVO: ${{ matrix.python }}
+      # El kit se analiza siempre contra su mínima soportada (python_objetivo = 3.10 en
+      # qgate.toml, estricto_version = false): en el job 3.12 python_version solo avisa.
       PYTHONUTF8: "1"
     defaults:
       run:
@@ -55,8 +55,6 @@ jobs:
       - name: Gate sobre demo_dashboard (debe APROBAR)
         if: matrix.python == '3.12'
         working-directory: examples/demo_dashboard
-        env:
-          QGATE_PYTHON_OBJETIVO: ""
         run: |
           python -m pip install -r requirements.txt
           if [ "${{ runner.os }}" = "Linux" ]; then
@@ -68,8 +66,6 @@ jobs:
 
       - name: Gate sobre vulnerable_fixtures (debe FALLAR)
         if: matrix.python == '3.12'
-        env:
-          QGATE_PYTHON_OBJETIVO: ""
         run: |
           if qgate run --level standard --path examples/vulnerable_fixtures; then
             echo "::error::El gate aprobó los fixtures vulnerables"; exit 1

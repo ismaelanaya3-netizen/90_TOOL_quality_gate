@@ -137,5 +137,7 @@ def test_registry_apply_details() -> None:
 
 
 def test_dates_accept_toml_datetimes() -> None:
-    item = parse_exception({**VALID, "creada": dt.datetime(2026, 10, 1, 8, 0), "vence": dt.date(2026, 12, 1)}, 1)
+    item = parse_exception(
+        {**VALID, "creada": dt.datetime(2026, 10, 1, 8, 0, tzinfo=dt.timezone.utc), "vence": dt.date(2026, 12, 1)}, 1
+    )
     assert item.created == dt.date(2026, 10, 1)

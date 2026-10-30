@@ -48,7 +48,7 @@ class TodoCheck(Check):
     title = "Comentarios TODO pendientes"
     level = Level.FAST
     tool = "qgate"
-    gate_key = "todos_pendientes"   # umbral en los perfiles (None = no exigido)
+    gate_key = "todos_pendientes"  # umbral en los perfiles (None = no exigido)
 
     def execute(self, ctx: RunContext) -> CheckResult:
         result = self.new()
@@ -58,9 +58,9 @@ class TodoCheck(Check):
                     result.findings.append(
                         Finding("qgate", "todo", Severity.LOW, line.strip(), rel_posix(path, ctx.root), number)
                     )
-        self.suppress(ctx, result)                      # aplica qgate-exceptions.toml
+        self.suppress(ctx, result)  # aplica qgate-exceptions.toml
         result.metrics.append(self.count_metric(self.gate_key, "TODO pendientes", result))
-        return self.finalize(ctx, result)               # PASS/FAIL según el perfil activo
+        return self.finalize(ctx, result)  # PASS/FAIL según el perfil activo
 ```
 
 2. Agregue la clase a `CHECK_CLASSES` en `checks/registry.py`.

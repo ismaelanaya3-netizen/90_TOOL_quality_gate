@@ -12,8 +12,8 @@ excluir = ["examples/**"]
 # El kit soporta Python >= 3.10: se tipa y se analiza contra la mínima soportada.
 python_objetivo = "3.10"
 python_ejecutable = ""
-# Librería multi-versión: la desalineación del intérprete solo avisa. En CI la matriz fija
-# QGATE_PYTHON_OBJETIVO con la versión de cada job.
+# Librería multi-versión: la desalineación del intérprete solo avisa (la matriz de CI ejecuta
+# 3.10 y 3.12; ruff y mypy validan siempre contra la mínima soportada).
 estricto_version = false
 
 [checks]

@@ -80,7 +80,9 @@ class DepsAuditCheck(Check):
             *tools.python_module_cmd("pip_audit"), "-r", str(req), "--format", "json",
             "--progress-spinner", "off", "--vulnerability-service", service,
         ]  # fmt: skip
-        if not ctx.cfg.option("dependencias", "auditar_transitivas", True):
+        # Without resolution pip-audit needs every requirement pinned; otherwise resolve.
+        fully_pinned = all(r.pinned for r in parse_requirements(req, ctx.root))
+        if fully_pinned and not ctx.cfg.option("dependencias", "auditar_transitivas", True):
             args += ["--no-deps", "--disable-pip"]
         return args
 

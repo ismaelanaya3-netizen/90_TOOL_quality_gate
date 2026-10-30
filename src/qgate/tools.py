@@ -91,7 +91,14 @@ def find_executable(name: str, extra_dirs: Sequence[Path] = ()) -> str | None:
 
 
 def python_module_cmd(module: str, python: str | None = None) -> list[str]:
+    if module in _NO_MAIN:
+        # packages without ``__main__``: call their console entry point directly
+        code = f"import sys,{module};sys.argv[0]='{module}';sys.exit({module}.main())"
+        return [python or sys.executable, "-c", code]
     return [python or sys.executable, "-m", module]
+
+
+_NO_MAIN = {"vermin"}
 
 
 _VERSION_RE = re.compile(r"(\d+\.\d+(?:\.\d+)?)")

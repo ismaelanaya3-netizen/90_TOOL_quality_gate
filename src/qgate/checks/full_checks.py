@@ -120,7 +120,7 @@ def probe_errors(app: RunningApp, health: str, max_kb: int) -> list[Finding]:
         )
     big = b"x" * ((max_kb + 1) * 1024)
     status = app.request("POST", health, body=big, headers={"Content-Type": "application/octet-stream"}).status
-    if status not in {400, 405, 411, 413}:
+    if status not in {400, 411, 413}:  # 405 means the body was never limited
         sev = Severity.HIGH if status >= 500 else Severity.MEDIUM
         findings.append(
             _finding("request-size", f"POST de {max_kb + 1} KB devolvió {status} (se esperaba 4xx)", health, sev)

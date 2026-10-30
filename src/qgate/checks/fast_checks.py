@@ -41,7 +41,7 @@ class FormatCheck(Check):
     gate_key = "formato_diferencias"
 
     def build_command(self, ctx: RunContext) -> list[str]:
-        return [*ruff_base(ctx, "format"), "--check", "."]
+        return [*ruff_base(ctx, "format"), "--check", "--output-format", "concise", "."]
 
     def execute(self, ctx: RunContext) -> CheckResult:
         result = self.new()
@@ -49,15 +49,22 @@ class FormatCheck(Check):
         out = tools.run(self.build_command(ctx), cwd=ctx.root, timeout=RUFF_TIMEOUT)
         if out.missing or (out.returncode not in {0, 1}):
             return self.error(f"ruff format falló: {out.stderr.strip()[:500]}")
+        files: dict[str, int] = {}
         for line in out.stdout.splitlines():
-            if line.startswith("Would reformat:"):
-                path = line.split(":", 1)[1].strip()
-                result.findings.append(
-                    Finding("ruff", "format", Severity.LOW, "Archivo sin formatear", path.replace("\\", "/"))
-                )
+            match = _FORMAT_RE.match(line.strip())
+            if match:
+                files.setdefault(match.group("file") or match.group("legacy"), int(match.group("line") or 1))
+        if out.returncode == 1 and not files:
+            files["."] = 1  # unknown output format: never let an unformatted tree pass
+        for path, row in files.items():
+            rel = rel_posix(ctx.root / path, ctx.root)
+            result.findings.append(Finding("ruff", "format", Severity.LOW, "Archivo sin formatear", rel, row))
         self.suppress(ctx, result)
         result.metrics.append(self.count_metric(self.gate_key, "Archivos sin formato", result))
         return self.finalize(ctx, result)
+
+
+_FORMAT_RE = re.compile(r"^(?:(?P<file>.+?):(?P<line>\d+):\d+: unformatted|Would reformat: (?P<legacy>.+))")
 
 
 class LintCheck(Check):

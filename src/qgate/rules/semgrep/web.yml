@@ -1,0 +1,103 @@
+# Reglas locales versionadas de qgate: configuración web (FastAPI/Starlette), TLS y XML.
+rules:
+  - id: qgate-cors-wildcard
+    languages: [python]
+    severity: ERROR
+    message: CORS con origen "*". Restrinja allow_origins a los dominios internos esperados.
+    metadata: {cwe: "CWE-942: Permissive Cross-domain Policy", owasp: "A05:2021 - Security Misconfiguration", category: security}
+    pattern-either:
+      - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_origins=[..., "*", ...], ...)
+      - pattern: $APP.add_middleware(CORSMiddleware, ..., allow_origin_regex=".*", ...)
+      - pattern: Middleware(CORSMiddleware, ..., allow_origins=[..., "*", ...], ...)
+
+  - id: qgate-debug-enabled
+    languages: [python]
+    severity: WARNING
+    message: Modo debug/reload activado en código. Debe controlarse por configuración y estar apagado en producción.
+    metadata: {cwe: "CWE-489: Active Debug Code", owasp: "A05:2021 - Security Misconfiguration", category: security}
+    pattern-either:
+      - pattern: FastAPI(..., debug=True, ...)
+      - pattern: fastapi.FastAPI(..., debug=True, ...)
+      - pattern: Starlette(..., debug=True, ...)
+      - pattern: uvicorn.run(..., debug=True, ...)
+      - pattern: uvicorn.run(..., reload=True, ...)
+      - pattern: $APP.run(..., debug=True, ...)
+
+  - id: qgate-cookie-insecure
+    languages: [python]
+    severity: WARNING
+    message: Cookie sin secure=True, httponly=True y samesite. Configure las tres banderas.
+    metadata: {cwe: "CWE-614: Sensitive Cookie Without Secure Attribute", owasp: "A05:2021", category: security}
+    patterns:
+      - pattern: $R.set_cookie(...)
+      - pattern-not: $R.set_cookie(..., secure=True, ..., httponly=True, ..., samesite=$S, ...)
+
+  - id: qgate-tls-verify-disabled
+    languages: [python]
+    severity: ERROR
+    message: Verificación TLS deshabilitada (verify=False). Use el bundle de CA corporativo (verify="ruta/ca.pem").
+    metadata: {cwe: "CWE-295: Improper Certificate Validation", owasp: "A02:2021 - Cryptographic Failures", category: security}
+    pattern-either:
+      - pattern: requests.$M(..., verify=False, ...)
+      - pattern: httpx.$M(..., verify=False, ...)
+      - pattern: httpx.Client(..., verify=False, ...)
+      - pattern: httpx.AsyncClient(..., verify=False, ...)
+      - pattern: $S.verify = False
+      - pattern: ssl._create_unverified_context(...)
+
+  - id: qgate-insecure-xml-parser
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Parser XML de la biblioteca estándar/lxml vulnerable a XXE y "billion laughs" (respuestas
+      SOAP). Use defusedxml (defusedxml.ElementTree.fromstring).
+    metadata: {cwe: "CWE-611: Improper Restriction of XML External Entity Reference", owasp: "A05:2021", category: security}
+    pattern-either:
+      - pattern: xml.etree.ElementTree.parse(...)
+      - pattern: xml.etree.ElementTree.fromstring(...)
+      - pattern: xml.etree.ElementTree.XML(...)
+      - pattern: xml.etree.ElementTree.iterparse(...)
+      - pattern: xml.dom.minidom.parse(...)
+      - pattern: xml.dom.minidom.parseString(...)
+      - pattern: xml.sax.parse(...)
+      - pattern: xml.sax.parseString(...)
+      - pattern: lxml.etree.fromstring(...)
+      - pattern: lxml.etree.parse(...)
+      - pattern: lxml.etree.XML(...)
+
+  - id: qgate-jinja-autoescape-off
+    languages: [python]
+    severity: WARNING
+    message: Jinja2 sin autoescape permite XSS. Use autoescape=True o select_autoescape().
+    metadata: {cwe: "CWE-79: Cross-site Scripting", owasp: "A03:2021 - Injection", category: security}
+    pattern-either:
+      - pattern: jinja2.Environment(..., autoescape=False, ...)
+      - pattern: Environment(..., autoescape=False, ...)
+
+  - id: qgate-hardcoded-credential
+    languages: [python]
+    severity: WARNING
+    message: Posible credencial fija en el código. Léala de variables de entorno o de un almacén de secretos.
+    metadata: {cwe: "CWE-798: Use of Hard-coded Credentials", owasp: "A07:2021", category: security}
+    patterns:
+      - pattern-either:
+          - pattern: $NAME = "$VALUE"
+          - pattern: '$NAME: $T = "$VALUE"'
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i)^(.*_)?(password|passwd|pwd|secret|secret_key|api_key|apikey|token|access_key|client_secret)$
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: ^[^\s{}$]{8,}$
+
+  - id: qgate-weak-hash
+    languages: [python]
+    severity: WARNING
+    message: Hash débil (MD5/SHA1) para uso de seguridad. Use SHA-256 o superior.
+    metadata: {cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm", owasp: "A02:2021", category: security}
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.md5(...)
+          - pattern: hashlib.sha1(...)
+      - pattern-not: hashlib.md5(..., usedforsecurity=False, ...)
+      - pattern-not: hashlib.sha1(..., usedforsecurity=False, ...)

@@ -1,0 +1,118 @@
+# Reglas locales versionadas de qgate: inyección y ejecución de código.
+rules:
+  - id: qgate-sql-injection-string-building
+    languages: [python]
+    severity: ERROR
+    message: >-
+      SQL construido con f-string, concatenación, % o .format(). Use parámetros enlazados
+      (pyodbc: "?"; SQLAlchemy text(): ":nombre" con .bindparams o diccionario de parámetros).
+    metadata: {cwe: "CWE-89: SQL Injection", owasp: "A03:2021 - Injection", category: security}
+    pattern-either:
+      - pattern: $X.execute(f"...", ...)
+      - pattern: $X.execute("..." + $Y, ...)
+      - pattern: $X.execute("..." % $Y, ...)
+      - pattern: $X.execute("...".format(...), ...)
+      - pattern: $X.executemany(f"...", ...)
+      - pattern: $X.exec_driver_sql(f"...", ...)
+      - pattern: sqlalchemy.text(f"...")
+      - pattern: sqlalchemy.text("..." + $Y)
+      - pattern: sqlalchemy.text("..." % $Y)
+      - pattern: sqlalchemy.text("...".format(...))
+      - pattern: text(f"...")
+      - pattern: text("..." + $Y)
+      - pattern: text("..." % $Y)
+      - pattern: text("...".format(...))
+      - patterns:
+          - pattern-inside: |
+              $Q = f"..."
+              ...
+          - pattern-either:
+              - pattern: $X.execute($Q, ...)
+              - pattern: text($Q)
+              - pattern: sqlalchemy.text($Q)
+      - patterns:
+          - pattern-inside: |
+              $Q = "..." + $Y
+              ...
+          - pattern-either:
+              - pattern: $X.execute($Q, ...)
+              - pattern: text($Q)
+
+  - id: qgate-eval-exec
+    languages: [python]
+    severity: ERROR
+    message: Uso de eval()/exec() con datos dinámicos. Permite ejecución arbitraria de código.
+    metadata: {cwe: "CWE-95: Eval Injection", owasp: "A03:2021 - Injection", category: security}
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+      - pattern-not: eval("...")
+      - pattern-not: exec("...")
+
+  - id: qgate-subprocess-shell
+    languages: [python]
+    severity: ERROR
+    message: Ejecución de comandos a través de la shell. Use listas de argumentos con shell=False.
+    metadata: {cwe: "CWE-78: OS Command Injection", owasp: "A03:2021 - Injection", category: security}
+    pattern-either:
+      - pattern: subprocess.$F(..., shell=True, ...)
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+
+  - id: qgate-unsafe-deserialization
+    languages: [python]
+    severity: WARNING
+    message: Deserialización insegura (pickle/marshal/shelve/dill). Nunca deserialice datos no confiables.
+    metadata: {cwe: "CWE-502: Deserialization of Untrusted Data", owasp: "A08:2021", category: security}
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+      - pattern: marshal.loads(...)
+      - pattern: shelve.open(...)
+      - pattern: dill.loads(...)
+
+  - id: qgate-yaml-unsafe-load
+    languages: [python]
+    severity: ERROR
+    message: yaml.load sin SafeLoader permite construir objetos arbitrarios. Use yaml.safe_load().
+    metadata: {cwe: "CWE-502: Deserialization of Untrusted Data", owasp: "A08:2021", category: security}
+    patterns:
+      - pattern-either:
+          - pattern: yaml.load(...)
+          - pattern: yaml.load_all(...)
+          - pattern: yaml.unsafe_load(...)
+      - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+      - pattern-not: yaml.load(..., Loader=SafeLoader, ...)
+      - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader, ...)
+      - pattern-not: yaml.load_all(..., Loader=yaml.SafeLoader, ...)
+
+  - id: qgate-ssrf-dynamic-url
+    languages: [python]
+    severity: WARNING
+    message: >-
+      URL construida dinámicamente en una petición HTTP saliente (posible SSRF). Valide el host
+      contra una lista permitida antes de llamar.
+    metadata: {cwe: "CWE-918: Server-Side Request Forgery (SSRF)", owasp: "A10:2021 - SSRF", category: security}
+    pattern-either:
+      - pattern: requests.$M(f"...", ...)
+      - pattern: requests.$M("..." + $X, ...)
+      - pattern: httpx.$M(f"...", ...)
+      - pattern: httpx.$M("..." + $X, ...)
+      - pattern: urllib.request.urlopen($X, ...)
+
+  - id: qgate-path-traversal
+    languages: [python]
+    severity: WARNING
+    message: >-
+      Ruta de archivo construida con datos dinámicos (posible path traversal). Resuelva la ruta y
+      verifique que queda dentro del directorio permitido.
+    metadata: {cwe: "CWE-22: Path Traversal", owasp: "A01:2021 - Broken Access Control", category: security}
+    pattern-either:
+      - pattern: open(f"...", ...)
+      - pattern: open("..." + $X, ...)
+      - pattern: open(os.path.join(..., $X), ...)
+      - pattern: FileResponse(f"...", ...)
+      - pattern: FileResponse(os.path.join(..., $X), ...)
+      - pattern: fastapi.responses.FileResponse(f"...", ...)
+      - pattern: starlette.responses.FileResponse(f"...", ...)

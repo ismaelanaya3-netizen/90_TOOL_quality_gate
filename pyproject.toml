@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qgate"
+version = "0.1.0"
+description = "Quality Gate Kit: controles locales de calidad, pruebas y seguridad más estrictos que el pipeline corporativo."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Ismael Anaya" }]
+dependencies = ["tomli>=2.0; python_version < '3.11'"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.optional-dependencies]
+tools = [
+    "ruff", "mypy", "pytest", "pytest-cov", "radon", "xenon", "bandit", "semgrep",
+    "pip-audit", "pip-licenses", "cyclonedx-bom", "detect-secrets", "schemathesis",
+    "locust", "vermin", "pre-commit", "nox",
+]
+
+[project.scripts]
+qgate = "qgate.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+qgate = ["templates/*", "templates/.*", "templates/vscode/*", "rules/semgrep/*.yml", "py.typed"]
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+extend-exclude = ["examples"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603", "S607", "PLR2004", "S108"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["slow: pruebas que levantan la app o ejecutan herramientas pesadas"]
+
+[tool.coverage.run]
+branch = true
+source = ["qgate"]
+
+[tool.coverage.report]
+show_missing = true

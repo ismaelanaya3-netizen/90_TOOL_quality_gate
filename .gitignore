@@ -1,0 +1,12 @@
+.venv/
+.qgate/
+__pycache__/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.nox/
+build/
+dist/
+*.bak

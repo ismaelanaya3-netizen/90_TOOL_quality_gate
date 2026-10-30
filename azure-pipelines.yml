@@ -1,0 +1,203 @@
+# =============================================================================
+# Quality Gate Kit (qgate) — plantilla de pipeline para Azure DevOps
+# Generada por `qgate init`. Etapas:
+#   1. Validate  : en cada PR -> qgate run --level standard --ci
+#   2. DeepScan  : en main o manual (runFull=true) -> qgate run --level full --ci
+# Publica JUnit, cobertura, SARIF (pestaña Scans) y la carpeta .qgate/latest.
+# =============================================================================
+
+parameters:
+  # Pool self-hosted (agente instalado en un servidor interno). Vacío = agentes de Microsoft.
+  # Para un agente propio: instale el agente de Azure Pipelines en el servidor Windows,
+  # regístrelo en un pool (p. ej. "EPM-Windows") e indique aquí ese nombre.
+  - name: poolName
+    displayName: Pool de agentes self-hosted (vacío = windows-latest)
+    type: string
+    default: ''
+  # Debe coincidir con [entorno].python_objetivo de qgate.toml (se verifica abajo).
+  - name: pythonVersion
+    displayName: Versión de Python objetivo
+    type: string
+    default: '3.12'
+  - name: runFull
+    displayName: Ejecutar DeepScan (nivel full) aunque no sea main
+    type: boolean
+    default: false
+  # Origen del kit. Si los agentes no tienen salida a GitHub, publique el kit en un
+  # feed de Azure Artifacts o vendorícelo en el repositorio (p. ej. tools/qgate) y use esa ruta.
+  - name: qgateSource
+    displayName: Origen pip del kit qgate
+    type: string
+    default: 'qgate @ git+https://github.com/ismaelanaya3-netizen/90_TOOL_quality_gate@v0.1.0'
+
+trigger:
+  branches:
+    include: [main]
+
+pr:
+  branches:
+    include: ['*']
+
+variables:
+  # Caché de pip compartida entre ejecuciones (tarea Cache@2).
+  PIP_CACHE_DIR: $(Pipeline.Workspace)/.pip
+  # Activa el modo CI de qgate: cualquier check obligatorio omitido se convierte en FAIL.
+  QGATE_CI: '1'
+  QGATE_PYTHON_OBJETIVO: ${{ parameters.pythonVersion }}
+  PYTHONUTF8: '1'
+
+stages:
+  # ---------------------------------------------------------------------------
+  # Etapa 1: validación estándar en cada PR
+  # ---------------------------------------------------------------------------
+  - stage: Validate
+    displayName: Quality Gate (standard)
+    jobs:
+      - job: QualityGate
+        displayName: qgate standard
+        timeoutInMinutes: 60
+        pool:
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: windows-latest
+          ${{ else }}:
+            name: ${{ parameters.poolName }}
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          # En agentes self-hosted, UsePythonVersion requiere la versión en el tool cache del agente.
+          - task: UsePythonVersion@0
+            displayName: Usar Python ${{ parameters.pythonVersion }}
+            inputs:
+              versionSpec: '${{ parameters.pythonVersion }}'
+
+          # Falla temprano si qgate.toml y el parámetro pythonVersion se desalinean.
+          - task: PythonScript@0
+            displayName: Verificar alineación de python_objetivo
+            inputs:
+              scriptSource: inline
+              script: |
+                import re, sys
+                from pathlib import Path
+                expected = "${{ parameters.pythonVersion }}"
+                text = Path("qgate.toml").read_text(encoding="utf-8") if Path("qgate.toml").exists() else ""
+                match = re.search(r'^\s*python_objetivo\s*=\s*"([^"]+)"', text, re.MULTILINE)
+                found = match.group(1) if match else "3.12"
+                running = "%d.%d" % sys.version_info[:2]
+                print(f"qgate.toml python_objetivo={found} | parámetro pythonVersion={expected} | agente={running}")
+                if found != expected or running != expected:
+                    print(f"##vso[task.logissue type=error]python_objetivo ({found}), pythonVersion ({expected}) y el Python del agente ({running}) deben coincidir.")
+                    sys.exit(1)
+
+          - task: Cache@2
+            displayName: Caché de pip
+            inputs:
+              key: 'pip | "$(Agent.OS)" | ${{ parameters.pythonVersion }} | requirements-dev.lock | requirements.txt'
+              restoreKeys: |
+                pip | "$(Agent.OS)" | ${{ parameters.pythonVersion }}
+              path: $(PIP_CACHE_DIR)
+
+          - script: |
+              python -m pip install --upgrade pip
+              python -m pip install -r requirements-dev.lock
+              python -m pip install "${{ parameters.qgateSource }}"
+              python -m pip install -r requirements.txt
+            displayName: Instalar herramientas, qgate y dependencias del proyecto
+
+          - script: qgate doctor
+            displayName: Diagnóstico del entorno (qgate doctor)
+            continueOnError: true
+
+          - script: qgate run --level standard --ci
+            displayName: Quality Gate standard
+
+          - task: PublishTestResults@2
+            displayName: Publicar pruebas (JUnit)
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: |
+                .qgate/latest/junit.xml
+                .qgate/latest/qgate-junit.xml
+              mergeTestResults: false
+              failTaskOnFailedTests: false
+
+          - task: PublishCodeCoverageResults@2
+            displayName: Publicar cobertura
+            condition: succeededOrFailed()
+            inputs:
+              summaryFileLocation: .qgate/latest/coverage.xml
+
+          # La extensión "SARIF SAST Scans Tab" lee el artefacto llamado CodeAnalysisLogs.
+          - task: PublishBuildArtifacts@1
+            displayName: Publicar SARIF (pestaña Scans)
+            condition: succeededOrFailed()
+            inputs:
+              PathtoPublish: .qgate/latest/results.sarif
+              ArtifactName: CodeAnalysisLogs
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publicar informe qgate-report
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: .qgate/latest
+              artifact: qgate-report
+
+  # ---------------------------------------------------------------------------
+  # Etapa 2: análisis profundo (DAST, carga, API) en main o bajo demanda
+  # ---------------------------------------------------------------------------
+  - stage: DeepScan
+    displayName: Quality Gate (full)
+    dependsOn: Validate
+    condition: and(succeeded(), or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), eq('${{ parameters.runFull }}', 'True')))
+    jobs:
+      - job: DeepScan
+        displayName: qgate full
+        timeoutInMinutes: 90
+        # ZAP baseline necesita Docker (imagen Linux). Sin pool propio se usa ubuntu-latest.
+        # En un agente Windows sin Docker, dast_zap quedará SKIPPED y en CI fallará:
+        # agréguelo a [checks].opcionales o instale ZAP en el agente.
+        pool:
+          ${{ if eq(parameters.poolName, '') }}:
+            vmImage: ubuntu-latest
+          ${{ else }}:
+            name: ${{ parameters.poolName }}
+        steps:
+          - checkout: self
+            fetchDepth: 0
+          - task: UsePythonVersion@0
+            displayName: Usar Python ${{ parameters.pythonVersion }}
+            inputs:
+              versionSpec: '${{ parameters.pythonVersion }}'
+          - task: Cache@2
+            displayName: Caché de pip
+            inputs:
+              key: 'pip | "$(Agent.OS)" | ${{ parameters.pythonVersion }} | requirements-dev.lock | requirements.txt'
+              path: $(PIP_CACHE_DIR)
+          - script: |
+              python -m pip install --upgrade pip
+              python -m pip install -r requirements-dev.lock
+              python -m pip install "${{ parameters.qgateSource }}"
+              python -m pip install -r requirements.txt
+            displayName: Instalar herramientas, qgate y dependencias del proyecto
+          - script: qgate run --level full --ci
+            displayName: Quality Gate full
+          - task: PublishTestResults@2
+            displayName: Publicar pruebas (JUnit)
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: .qgate/latest/qgate-junit.xml
+              testRunTitle: qgate full
+          - task: PublishBuildArtifacts@1
+            displayName: Publicar SARIF (pestaña Scans)
+            condition: succeededOrFailed()
+            inputs:
+              PathtoPublish: .qgate/latest/results.sarif
+              ArtifactName: CodeAnalysisLogs
+          - task: PublishPipelineArtifact@1
+            displayName: Publicar informe qgate-report-full
+            condition: succeededOrFailed()
+            inputs:
+              targetPath: .qgate/latest
+              artifact: qgate-report-full

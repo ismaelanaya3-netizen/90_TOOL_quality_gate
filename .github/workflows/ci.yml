@@ -1,0 +1,95 @@
+# Autoverificación del Quality Gate Kit en GitHub Actions.
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  kit:
+    name: kit (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.12"]
+    env:
+      # La versión objetivo del kit sigue a la del job (ver qgate.toml del kit).
+      QGATE_PYTHON_OBJETIVO: ${{ matrix.python }}
+      PYTHONUTF8: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements-dev.lock
+
+      - name: Instalar herramientas y kit
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.python }}" = "3.10" ]; then
+            # requirements-dev.lock exige Python >= 3.11; en 3.10 se resuelven versiones compatibles.
+            python -m pip install -e ".[tools]" jsonschema pyyaml types-PyYAML httpx
+          else
+            python -m pip install -r requirements-dev.lock
+            python -m pip install -e .
+          fi
+
+      - name: Pruebas del kit
+        run: python -m pytest -q
+
+      - name: Gate standard sobre el propio kit (debe APROBAR)
+        run: qgate run --level standard --ci
+
+      - name: Gate sobre demo_dashboard (debe APROBAR)
+        if: matrix.python == '3.12'
+        working-directory: examples/demo_dashboard
+        env:
+          QGATE_PYTHON_OBJETIVO: ""
+        run: |
+          python -m pip install -r requirements.txt
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            qgate run --level full --ci
+          else
+            # Sin Docker Linux en Windows: ZAP solo corre en Linux.
+            qgate run --level standard --ci
+          fi
+
+      - name: Gate sobre vulnerable_fixtures (debe FALLAR)
+        if: matrix.python == '3.12'
+        env:
+          QGATE_PYTHON_OBJETIVO: ""
+        run: |
+          if qgate run --level standard --path examples/vulnerable_fixtures; then
+            echo "::error::El gate aprobó los fixtures vulnerables"; exit 1
+          fi
+          python -m pytest -q tests/test_detection.py
+
+      - name: Publicar SARIF en code scanning
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: .qgate/latest/results.sarif
+          category: qgate-kit
+
+      - name: Subir informes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qgate-report-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            .qgate/latest
+            examples/demo_dashboard/.qgate/latest
+          if-no-files-found: ignore

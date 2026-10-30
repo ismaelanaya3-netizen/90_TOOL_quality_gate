@@ -87,25 +87,28 @@ def scan_file(path: Path, rel: str, scan: AstScan, allow_docs: bool) -> None:
     for node in ast.walk(tree):
         if isinstance(node, ast.Name) and node.id == "TrustedHostMiddleware":
             scan.trusted_host = True
-        if not isinstance(node, ast.Call):
-            continue
-        func = _name(node.func)
-        kwargs = {k.arg: k.value for k in node.keywords if k.arg}
-        if func in {"FastAPI", "Starlette"}:
-            if _is_true(kwargs.get("debug")):
-                scan.findings.append(_f("fastapi-debug", "debug=True en la aplicación", rel, node, Severity.HIGH))
-            exposed = _docs_exposed(kwargs)
-            if func == "FastAPI" and exposed and not allow_docs:
-                scan.findings.append(
-                    _f("fastapi-docs-exposed", f"Documentación expuesta por defecto: {', '.join(exposed)}", rel, node)
-                )
-        if func == "run" and (_is_true(kwargs.get("debug")) or _is_true(kwargs.get("reload"))):
-            scan.findings.append(_f("fastapi-debug", "debug/reload activo al servir la app", rel, node, Severity.HIGH))
-        args_names = [_name(a) for a in node.args]
-        if "CORSMiddleware" in args_names and (
-            _has_star(kwargs.get("allow_origins")) or _has_star(kwargs.get("allow_origin_regex"))
-        ):
-            scan.findings.append(_f("cors-wildcard", "CORS permite cualquier origen (*)", rel, node, Severity.HIGH))
+        if isinstance(node, ast.Call):
+            scan.findings.extend(check_call(node, rel, allow_docs))
+
+
+def check_call(node: ast.Call, rel: str, allow_docs: bool) -> list[Finding]:
+    """Insecure FastAPI/Starlette/uvicorn/CORS arguments in a single call."""
+    findings: list[Finding] = []
+    func = _name(node.func)
+    kwargs = {k.arg: k.value for k in node.keywords if k.arg}
+    if func in {"FastAPI", "Starlette"} and _is_true(kwargs.get("debug")):
+        findings.append(_f("fastapi-debug", "debug=True en la aplicación", rel, node, Severity.HIGH))
+    exposed = _docs_exposed(kwargs) if func == "FastAPI" and not allow_docs else []
+    if exposed:
+        findings.append(
+            _f("fastapi-docs-exposed", f"Documentación expuesta por defecto: {', '.join(exposed)}", rel, node)
+        )
+    if func == "run" and (_is_true(kwargs.get("debug")) or _is_true(kwargs.get("reload"))):
+        findings.append(_f("fastapi-debug", "debug/reload activo al servir la app", rel, node, Severity.HIGH))
+    wildcard = _has_star(kwargs.get("allow_origins")) or _has_star(kwargs.get("allow_origin_regex"))
+    if wildcard and "CORSMiddleware" in [_name(a) for a in node.args]:
+        findings.append(_f("cors-wildcard", "CORS permite cualquier origen (*)", rel, node, Severity.HIGH))
+    return findings
 
 
 def _f(rule: str, message: str, rel: str, node: ast.AST, severity: Severity = Severity.MEDIUM) -> Finding:

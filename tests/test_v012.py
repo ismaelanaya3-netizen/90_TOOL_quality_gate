@@ -150,3 +150,21 @@ def test_masking_keeps_variable_names(fixtures_gate: GateResult) -> None:
     assert findings[("bandit", "B105")] == 'Possible hardcoded password: GITHUB_TOKEN = "ghp_***"'
     assert findings[("ruff", "S105")] == 'Possible hardcoded password assigned to: "GITHUB_TOKEN"'
     assert findings[("gitleaks", "github-pat")].endswith("(valor: 'ghp_***')")
+
+
+def test_denied_license_reports_package_and_line(tmp_path: Path) -> None:
+    from qgate.checks.deps_checks import declared_lines, denied_licenses
+    from tests.conftest import make_ctx
+
+    write_project(
+        tmp_path, '[licencias]\npermitir_paquetes = ["allowed-gpl"]\n', {"requirements.txt": "a==1\ngpl_pkg==2\n"}
+    )
+    ctx = make_ctx(tmp_path)
+    data = [
+        {"Name": "gpl_pkg", "License": "GPL-3.0-only"},
+        {"Name": "allowed-gpl", "License": "GPL-3.0-only"},
+        {"Name": "a", "License": "MIT"},
+        {"Name": "lgpl", "License": "LGPL-2.1"},
+    ]
+    found = denied_licenses(ctx, data, declared_lines(tmp_path / "requirements.txt", tmp_path))
+    assert [(x.package, x.file, x.line) for x in found] == [("gpl-pkg", "requirements.txt", 2)]

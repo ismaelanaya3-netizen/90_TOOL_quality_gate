@@ -6,6 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from qgate import net, tools
 from qgate.checks.base import Check
@@ -159,6 +160,24 @@ class DepsPinnedCheck(Check):
         return self.finalize(ctx, result)
 
 
+def denied_licenses(ctx: RunContext, data: list[dict[str, Any]], declared: dict[str, Requirement]) -> list[Finding]:
+    """Findings for packages whose license matches the denylist, at the line they are declared."""
+    denylist = [re.compile(rx) for rx in ctx.cfg.str_list("licencias", "denegadas", DEFAULT_DENYLIST)]
+    allowed = {normalize(n) for n in ctx.cfg.str_list("licencias", "permitir_paquetes", [])}
+    findings = []
+    for item in data:
+        name, license_text = str(item.get("Name")), str(item.get("License", ""))
+        package = normalize(name)
+        if package in allowed or not any(rx.search(license_text) for rx in denylist):
+            continue
+        where = declared.get(package)
+        findings.append(
+            Finding("pip-licenses", "license-denied", Severity.HIGH, f"{name}: licencia '{license_text}'",
+                    where.file if where else "", where.line if where else 0, package=package)
+        )  # fmt: skip
+    return findings
+
+
 class LicensesCheck(Check):
     id = "licenses"
     title = "Licencias de dependencias de runtime"
@@ -182,17 +201,8 @@ class LicensesCheck(Check):
             data = json.loads(out.stdout or "[]")
         except json.JSONDecodeError:
             return self.error(f"pip-licenses falló: {out.stderr.strip()[:400]}")
-        denylist = [re.compile(rx) for rx in ctx.cfg.str_list("licencias", "denegadas", DEFAULT_DENYLIST)]
-        allowed = {normalize(n) for n in ctx.cfg.str_list("licencias", "permitir_paquetes", [])}
+        result.findings.extend(denied_licenses(ctx, data, declared))
         found = {normalize(str(item.get("Name", ""))) for item in data}
-        for item in data:
-            name, license_text = str(item.get("Name")), str(item.get("License", ""))
-            if normalize(name) not in allowed and any(rx.search(license_text) for rx in denylist):
-                where = declared.get(normalize(name))
-                result.findings.append(
-                    Finding("pip-licenses", "license-denied", Severity.HIGH, f"{name}: licencia '{license_text}'",
-                            where.file if where else "", where.line if where else 0, package=normalize(name))
-                )  # fmt: skip
         missing = [n for n in names if normalize(n) not in found]
         self.suppress(ctx, result)
         result.metrics.append(self.count_metric(self.gate_key, "Licencias prohibidas", result))

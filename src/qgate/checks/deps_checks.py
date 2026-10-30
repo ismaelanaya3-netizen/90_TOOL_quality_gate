@@ -67,6 +67,11 @@ def normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
+def declared_lines(req: Path, root: Path) -> dict[str, Requirement]:
+    """Normalized package name -> where it is declared (follows ``-r`` includes)."""
+    return {normalize(r.name): r for r in parse_requirements(req, root)}
+
+
 class DepsAuditCheck(Check):
     id = "deps_audit"
     title = "Dependencias vulnerables (pip-audit)"
@@ -99,18 +104,23 @@ class DepsAuditCheck(Check):
         result = self.new()
         result.tool_version = tools.version_of([*tools.python_module_cmd("pip_audit"), "--version"])
         for req in files:
+            declared = declared_lines(req, ctx.root)
             out = tools.run(self.build_command(ctx, req), cwd=ctx.root, timeout=1200)
             try:
                 data = json.loads(out.stdout or "")
             except json.JSONDecodeError:
                 return self.error(f"pip-audit falló con {req.name}: {out.stderr.strip()[-400:]}")
             for dep in data.get("dependencies", []):
+                package = normalize(str(dep.get("name", "")))
+                where = declared.get(package)
+                origin = "" if where else " [dependencia transitiva, no declarada en el archivo]"
                 for vuln in dep.get("vulns", []):
                     fixes = ", ".join(vuln.get("fix_versions", [])) or "sin versión corregida"
                     result.findings.append(
                         Finding("pip-audit", str(vuln.get("id")), Severity.HIGH,
-                                f"{dep.get('name')}=={dep.get('version')}: {vuln.get('id')} (corrige: {fixes})",
-                                rel_posix(req, ctx.root), 1, cwe="CWE-1395")
+                                f"{dep.get('name')}=={dep.get('version')}: {vuln.get('id')} (corrige: {fixes}){origin}",
+                                where.file if where else rel_posix(req, ctx.root), where.line if where else 0,
+                                cwe="CWE-1395", package=package)
                     )  # fmt: skip
         self.suppress(ctx, result)
         result.metrics.append(self.count_metric(self.gate_key, "Vulnerabilidades sin excepción", result))
@@ -140,7 +150,8 @@ class DepsPinnedCheck(Check):
             if not req.pinned:
                 result.findings.append(
                     Finding("qgate", "unpinned-dependency", Severity.MEDIUM,
-                            f"'{req.raw.strip()}' no usa versión exacta (==)", req.file, req.line, cwe="CWE-1104")
+                            f"'{req.raw.strip()}' no usa versión exacta (==)", req.file, req.line, cwe="CWE-1104",
+                            package=normalize(req.name))
                 )  # fmt: skip
         self.suppress(ctx, result)
         result.notes.append(f"{len(reqs)} dependencias revisadas en {', '.join(f.name for f in files) or 'pyproject'}")
@@ -158,6 +169,7 @@ class LicensesCheck(Check):
     def execute(self, ctx: RunContext) -> CheckResult:
         reqs = [r for f in requirement_files(ctx, "licencias") for r in parse_requirements(f, ctx.root)]
         names = sorted({r.name for r in reqs if r.spec != "editable"})
+        declared = {normalize(r.name): r for r in reqs}
         if not names:
             return self.info("no hay dependencias de runtime declaradas.")
         result = self.new()
@@ -176,9 +188,11 @@ class LicensesCheck(Check):
         for item in data:
             name, license_text = str(item.get("Name")), str(item.get("License", ""))
             if normalize(name) not in allowed and any(rx.search(license_text) for rx in denylist):
+                where = declared.get(normalize(name))
                 result.findings.append(
-                    Finding("pip-licenses", "license-denied", Severity.HIGH, f"{name}: licencia '{license_text}'")
-                )
+                    Finding("pip-licenses", "license-denied", Severity.HIGH, f"{name}: licencia '{license_text}'",
+                            where.file if where else "", where.line if where else 0, package=normalize(name))
+                )  # fmt: skip
         missing = [n for n in names if normalize(n) not in found]
         self.suppress(ctx, result)
         result.metrics.append(self.count_metric(self.gate_key, "Licencias prohibidas", result))

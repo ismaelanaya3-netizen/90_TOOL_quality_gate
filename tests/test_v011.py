@@ -136,7 +136,7 @@ def test_secret_findings_are_masked_everywhere() -> None:
     result.notes.append("nota con SuperSecreta123")
     redact_results([result], set())
     assert bandit.message.endswith("'Supe***'")
-    assert ruff.message.endswith('"pwd***"')
+    assert ruff.message.endswith('"pwd"')  # ruff quotes the argument name, not the value (v0.1.2)
     assert "SuperSecreta123" not in other.message + result.notes[0]
     assert mask("ghp_abcdef") == "ghp_***"
 
@@ -172,9 +172,12 @@ def test_group_findings_rules() -> None:
         f("pytest", "no-tests", 0, file=""), f("pytest", "no-tests", 0, file=""),
     ])  # fmt: skip
     sizes = sorted(len(g.items) for g in groups)
-    assert sizes == [1, 1, 1, 1, 3]
-    merged = next(g for g in groups if len(g.items) == 3)
-    assert merged.detected_by == "bandit (B608), ruff (S608), semgrep (qgate-sql-injection-string-building)"
+    # v0.1.2: ruff S608 at line 6 joins the line-5 SQL group (same rule, compatible CWE, <= 2 lines)
+    assert sizes == [1, 1, 1, 4]
+    merged = next(g for g in groups if len(g.items) == 4)
+    assert (
+        merged.detected_by == "bandit (B608), ruff (S608), ruff (S608), semgrep (qgate-sql-injection-string-building)"
+    )
     assert merged.cwe == "CWE-89"
 
 

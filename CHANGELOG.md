@@ -2,6 +2,33 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado semántico.
 
+## [0.1.2] - 2026-10-30
+
+### Corregido
+- **Agrupación de dependencias (bug)**: las vulnerabilidades de pip-audit se fusionaban en una sola
+  fila del HTML porque todas compartían archivo, línea 1 y CWE-1395. Ahora los hallazgos de
+  dependencias (pip-audit, `deps_pinned`, `licenses`) se agrupan solo por archivo + paquete + id
+  (CVE o regla), nunca por línea ni CWE. Nuevo campo `package` en cada hallazgo de `report.json`.
+- **pip-audit reporta la línea real** del paquete en el requirements/lock (siguiendo `-r`), y
+  `licenses` también. Las dependencias transitivas no declaradas usan la línea 0 y lo indican en el
+  mensaje.
+- **Enmascarado solo del valor**: en v0.1.1 el mensaje de ruff S105–S107 quedaba con el *nombre*
+  de la variable enmascarado (`"GITH***"`), porque ruff cita el nombre y no el valor. Ahora solo se
+  enmascaran literales (`password: '…'`, `valor: '…'`, `NOMBRE = '…'`). Bandit B105–B107 muestran
+  la sentencia de origen para conservar el nombre: `GITHUB_TOKEN = "ghp_***"`.
+
+### Cambiado (informe HTML)
+- **CWE del grupo según una tabla de precedencia** por familias (`CWE_FAMILIES` en
+  `report/grouping.py`): CWE-95 sobre CWE-78, CWE-502 sobre CWE-20, CWE-798 sobre CWE-259… Los
+  demás CWE del grupo se listan como "también: …".
+- **Mensaje del grupo en español**: se prefiere el de las reglas locales de qgate (semgrep `qgate-*`,
+  checks propios) sobre el de bandit/ruff.
+- **Agrupación tolerante**: misma regla equivalente + mismo archivo + CWE compatible y líneas a
+  ≤ 2 de distancia forman un solo grupo (sentencias multilínea, p. ej. `db.py:7-8`). El grupo
+  muestra el rango de líneas.
+- gitleaks, detect-secrets, bandit B105–B107, ruff S105–S107 y semgrep `qgate-hardcoded-credential`
+  comparten el concepto "credencial fija" y se agrupan en una sola fila.
+
 ## [0.1.1] - 2026-10-30
 
 ### Cambiado

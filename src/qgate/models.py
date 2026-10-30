@@ -60,6 +60,7 @@ class Finding:
     line: int = 0
     cwe: str = ""
     suppressed_by: str = ""
+    package: str = ""  # dependency findings: normalized package name (grouping key with the rule id)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,6 +72,7 @@ class Finding:
             "line": self.line,
             "cwe": self.cwe,
             "suppressed_by": self.suppressed_by,
+            "package": self.package,
         }
 
 

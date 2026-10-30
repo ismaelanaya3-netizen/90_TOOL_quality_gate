@@ -28,7 +28,7 @@ parameters:
   - name: qgateSource
     displayName: Origen pip del kit qgate
     type: string
-    default: 'qgate @ git+https://github.com/ismaelanaya3-netizen/90_TOOL_quality_gate@v0.1.1'
+    default: 'qgate @ git+https://github.com/ismaelanaya3-netizen/90_TOOL_quality_gate@v0.1.2'
 
 trigger:
   branches:

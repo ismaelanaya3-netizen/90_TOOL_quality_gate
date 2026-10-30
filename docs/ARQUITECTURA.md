@@ -114,6 +114,21 @@ mismo con `qgate run --level standard`).
 }
 ```
 
+Desde 0.1.2 cada hallazgo incluye `"package"` (nombre normalizado del paquete en hallazgos de
+dependencias; vacío en el resto), y los de pip-audit/licenses llevan la línea real del paquete.
+
+## Agrupación en el HTML (`report/grouping.py`)
+
+Solo afecta a la vista `report.html`; JSON y SARIF conservan todos los hallazgos.
+
+- **Dependencias**: archivo + paquete + id (CVE/regla). Nunca por línea ni CWE.
+- **Código**: mismo archivo y además (a) misma línea con regla equivalente o CWE compatible, o
+  (b) regla equivalente + CWE compatible con líneas a ≤ 2 (`LINE_TOLERANCE`).
+- Reglas equivalentes: ruff `S###` = bandit `B###`; reglas semgrep `qgate-*` mapeadas en
+  `EQUIVALENT`; secretos y credenciales fijas comparten el concepto `hardcoded-credential`.
+- CWE del grupo: el primero de su familia en `CWE_FAMILIES` (más específico); el resto se lista.
+- Mensaje: el de una regla local de qgate (en español) si existe; si no, el más severo.
+
 Desde 0.1.1 cada check incluye `"waiver"` (vacío o `{check, justificacion, responsable, creada,
 vence}`) y `status` puede valer `"INFO"`. Los mensajes de hallazgos de secretos llegan ya
 enmascarados (`ghp_***`).

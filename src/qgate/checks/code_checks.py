@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from qgate import tools
 from qgate.checks.base import Check, metric_rank
@@ -114,6 +115,24 @@ class TypingCheck(Check):
         return self.finalize(ctx, result)
 
 
+CREDENTIAL_TESTS = {"B105", "B106", "B107"}
+
+
+def bandit_message(item: dict[str, Any]) -> str:
+    """For hard-coded credentials show the source statement so the variable name is kept.
+
+    The literal itself is masked later by :mod:`qgate.redact` (``GITHUB_TOKEN = "ghp_***"``).
+    """
+    text = str(item.get("issue_text", ""))
+    if item.get("test_id") not in CREDENTIAL_TESTS:
+        return text
+    prefix = f"{item.get('line_number')} "
+    for line in str(item.get("code", "")).splitlines():
+        if line.startswith(prefix) and line[len(prefix) :].strip():
+            return f"{text.split(':')[0]}: {line[len(prefix) :].strip()[:160]}"
+    return text
+
+
 class BanditCheck(Check):
     id = "bandit"
     title = "SAST (bandit)"
@@ -134,7 +153,7 @@ class BanditCheck(Check):
             cwe = (item.get("issue_cwe") or {}).get("id")
             result.findings.append(
                 Finding("bandit", str(item.get("test_id")), Severity.parse(str(item.get("issue_severity", "LOW"))),
-                        str(item.get("issue_text", "")), rel_posix(Path(str(item.get("filename", ""))), ctx.root),
+                        bandit_message(item), rel_posix(Path(str(item.get("filename", ""))), ctx.root),
                         int(item.get("line_number", 0)), cwe=f"CWE-{cwe}" if cwe else "")
             )  # fmt: skip
         self.suppress(ctx, result)

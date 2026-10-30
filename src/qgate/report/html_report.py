@@ -120,18 +120,22 @@ def _findings(data: dict[str, Any]) -> str:
     rows = []
     for g in groups:
         sup = "<div class='muted'>Con excepción vigente</div>" if g.suppressed else ""
-        place = f"{_e(g.file)}:{_e(g.line)}" if g.file else "—"
+        place = _e(g.place) or "—"
+        if g.package:
+            place += f"<div class='muted'>paquete: {_e(g.package)}</div>"
+        cwe = _e(g.cwe) + (f"<div class='muted'>también: {_e(', '.join(g.other_cwes))}</div>" if g.other_cwes else "")
         rows.append(
             f"<tr data-sev='{_e(g.severity)}' data-tools=' {_e(' '.join(g.tools))} ' data-sup='{int(g.suppressed)}'"
             f"{' class=supp' if g.suppressed else ''}><td class='sev'>{_e(g.severity)}</td><td>{place}</td>"
-            f"<td>{_e(g.cwe)}</td><td>{_e(g.message)}{sup}</td>"
+            f"<td>{cwe}</td><td>{_e(g.message)}{sup}</td>"
             f"<td>Detectado por: {_e(g.detected_by)}</td></tr>"
         )
     sev_opts = "".join(f"<option>{s}</option>" for s in SEVERITIES)
     tool_opts = "".join(f"<option>{_e(t)}</option>" for t in tools)
     summary = (
-        f"<p class='muted'>{len(items)} hallazgos agrupados en {len(groups)} por archivo + línea + CWE/regla "
-        "equivalente. La lista completa está en report.json y results.sarif.</p>"
+        f"<p class='muted'>{len(items)} hallazgos agrupados en {len(groups)}: código por archivo + regla "
+        "equivalente + CWE compatible (líneas a ≤ 2); dependencias por archivo + paquete + id. "
+        "La lista completa está en report.json y results.sarif.</p>"
     )
     return (
         summary + "<div class='toolbar'><label>Severidad <select id='fsev'><option value=''>Todas</option>"

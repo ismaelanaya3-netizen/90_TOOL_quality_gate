@@ -48,7 +48,10 @@ mypy_path = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
-markers = ["slow: pruebas que levantan la app o ejecutan herramientas pesadas"]
+markers = [
+    "slow: pruebas que levantan la app o ejecutan herramientas pesadas",
+    "demo: pruebas que usan examples/demo_dashboard (Python >= 3.11)",
+]
 
 [tool.coverage.run]
 branch = true

@@ -2,6 +2,15 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado semántico.
 
+## [Sin publicar]
+
+### Corregido
+- `install.ps1`: antes de crear `.venv` valida el intérprete (versión ≥ 3.11, módulos `venv` y
+  `ensurepip`). Si falla, muestra la salida real de Python y, con el lanzador `py`, las versiones
+  instaladas (`py -0p`) con la sugerencia de `-PythonVersion`/`-PythonExe`. Antes solo decía
+  "No se pudo crear el entorno virtual." (caso real: equipo con solo Python 3.13 y `-PythonVersion 3.12`).
+- Se evita que Windows PowerShell 5.1 convierta el stderr de Python en una excepción sin contexto.
+
 ## [0.1.2] - 2026-10-30
 
 ### Corregido

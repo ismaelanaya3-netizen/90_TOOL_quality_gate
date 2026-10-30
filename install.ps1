@@ -41,17 +41,69 @@ if ($proxy) {
 }
 
 # --- 1. Entorno virtual ------------------------------------------------------
+function Invoke-Native([string]$Exe, [string[]]$Arguments) {
+    # Windows PowerShell 5.1 convierte el stderr redirigido en error terminante con "Stop".
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $Exe @Arguments 2>&1 | ForEach-Object { "$_" }
+        return [pscustomobject]@{ Code = $LASTEXITCODE; Output = (@($output) -join "`n") }
+    } catch {
+        return [pscustomobject]@{ Code = 9009; Output = "$_" }
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
+function Resolve-Python {
+    # Devuelve la ruta de un python.exe >= 3.11 con venv y ensurepip, o falla explicando por qué.
+    $probe = @("-c", "import sys, venv, ensurepip; print(sys.executable); print('%d.%d' % sys.version_info[:2])")
+    if ($PythonExe) {
+        $exe = $PythonExe; $prefix = @()
+    } elseif (Get-Command py -ErrorAction SilentlyContinue) {
+        $exe = "py"; $prefix = @("-$PythonVersion")
+    } else {
+        $exe = "python"; $prefix = @()
+    }
+    $result = Invoke-Native $exe ($prefix + $probe)
+    if ($result.Code -ne 0) {
+        if ($exe -eq "py") {
+            $installed = (Invoke-Native "py" @("-0p")).Output
+            $hint = "Versiones instaladas según 'py -0p':`n$installed`n" +
+                    "Repita con -PythonVersion <una de ellas, >= 3.11> o con -PythonExe <ruta a python.exe>."
+        } else {
+            $hint = "Instale Python >= 3.11 desde python.org (el alias de Microsoft Store no sirve) " +
+                    "o indique -PythonExe <ruta a python.exe>."
+        }
+        throw ("No se encontró un Python $PythonVersion utilizable ('$exe $($prefix -join ' ')').`n" +
+               "Salida: $($result.Output)`n$hint`n" +
+               "Si dice 'No module named venv' o 'ensurepip', ese Python no es una instalación completa " +
+               "(p. ej. la versión 'embeddable'): use el instalador normal de python.org.")
+    }
+    $lines = @($result.Output -split "`n" | Where-Object { $_.Trim() })
+    $found = $lines[-2].Trim()
+    $version = $lines[-1].Trim()
+    if ([version]$version -lt [version]"3.11") {
+        throw "Python $version ($found) es demasiado antiguo: requirements-dev.lock exige Python >= 3.11."
+    }
+    if ($version -ne $PythonVersion) {
+        Write-Warning "Se usará Python $version ($found), distinto de -PythonVersion $PythonVersion."
+    }
+    return $found
+}
+
 $venvPython = Join-Path $ProjectPath ".venv\Scripts\python.exe"
 if (-not (Test-Path $venvPython)) {
-    Write-Step "Creando .venv con Python $PythonVersion"
-    if ($PythonExe) {
-        & $PythonExe -m venv .venv
-    } elseif (Get-Command py -ErrorAction SilentlyContinue) {
-        & py "-$PythonVersion" -m venv .venv
-    } else {
-        & python -m venv .venv
+    $python = Resolve-Python
+    Write-Step "Creando .venv con $python"
+    $result = Invoke-Native $python @("-m", "venv", (Join-Path $ProjectPath ".venv"))
+    if ($result.Code -ne 0 -or -not (Test-Path $venvPython)) {
+        throw ("No se pudo crear el entorno virtual con $python (código $($result.Code)).`n" +
+               "Salida: $($result.Output)`n" +
+               "Causas frecuentes: antivirus o política corporativa que bloquea ejecutables en la carpeta, " +
+               "ruta sin permisos de escritura, o una carpeta .venv incompleta de un intento anterior " +
+               "(bórrela y reintente).")
     }
-    if ($LASTEXITCODE -ne 0) { throw "No se pudo crear el entorno virtual." }
 }
 
 # --- 2. Herramientas y kit -----------------------------------------------------

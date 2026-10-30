@@ -36,8 +36,8 @@ def build(gate: GateResult) -> bytes:
             SubElement(case, "error", message=result.reason or "ERROR")
         elif result.status is Status.SKIPPED:
             SubElement(case, "skipped", message=result.reason)
-        elif result.status is Status.WARN:
-            SubElement(case, "system-out").text = f"WARN: {result.reason}"
+        elif result.status in {Status.WARN, Status.INFO}:
+            SubElement(case, "system-out").text = f"{result.status.value}: {result.reason}"
     root = Element("testsuites", name="qgate")
     root.append(suite)
     body: bytes = tostring(root, encoding="utf-8")

@@ -32,7 +32,7 @@ class ApiPropertiesCheck(Check):
         if not exe:
             return self.skipped("schemathesis no está instalado.")
         if not ctx.cfg.app_module:
-            return self.skipped("Sin app_module: no hay API que probar.", mandatory=False)
+            return self.info("no hay app_module configurado (sin API que probar).")
         schema = ctx.out_dir / "openapi.json"
         problem = dump_openapi(ctx, schema)
         if problem:
@@ -144,7 +144,7 @@ class HttpBehaviorCheck(Check):
 
     def execute(self, ctx: RunContext) -> CheckResult:
         if not ctx.cfg.app_module:
-            return self.skipped("Sin app_module: no hay app que levantar.", mandatory=False)
+            return self.info("no hay app_module configurado (sin app que levantar).")
         result = self.new()
         with serve(ctx, "http") as app:
             result.findings.extend(http_probes(app, ctx))
@@ -169,7 +169,7 @@ class ZapBaselineCheck(Check):
 
     def execute(self, ctx: RunContext) -> CheckResult:
         if not ctx.cfg.app_module:
-            return self.skipped("Sin app_module: no hay app que escanear.", mandatory=False)
+            return self.info("no hay app_module configurado (sin app que escanear).")
         if not docker_available():
             return self.skipped(ZAP_HELP)
         result = self.new()
@@ -237,7 +237,7 @@ class LoadSmokeCheck(Check):
 
     def execute(self, ctx: RunContext) -> CheckResult:
         if not ctx.cfg.app_module:
-            return self.skipped("Sin app_module: no hay app que cargar.", mandatory=False)
+            return self.info("no hay app_module configurado (sin app que cargar).")
         if not tools.module_available("locust"):
             return self.skipped("locust no está instalado.")
         result = self.new()

@@ -48,6 +48,7 @@ def check_dict(result: CheckResult, profiles: dict[str, dict[str, Any]], active:
         "findings": [f.to_dict() for f in result.findings],
         "applied_exceptions": result.applied_exceptions,
         "expired_exceptions": result.expired_exceptions,
+        "waiver": result.waiver,
     }
 
 

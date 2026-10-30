@@ -31,6 +31,7 @@ class Status(str, Enum):
     WARN = "WARN"
     SKIPPED = "SKIPPED"
     ERROR = "ERROR"
+    INFO = "INFO"  # nothing to verify: informative, never blocks
 
 
 class Level(str, Enum):
@@ -119,6 +120,8 @@ class CheckResult:
     applied_exceptions: list[str] = field(default_factory=list)
     expired_exceptions: list[str] = field(default_factory=list)
     artifacts: list[str] = field(default_factory=list)
+    # justified [[checks.desactivados]] entry that skipped this check (empty if none)
+    waiver: dict[str, str] = field(default_factory=dict)
 
     @property
     def active_findings(self) -> list[Finding]:
@@ -148,4 +151,4 @@ class GateResult:
 
     @property
     def omissions(self) -> list[CheckResult]:
-        return [r for r in self.results if r.status is Status.SKIPPED and r.mandatory]
+        return [r for r in self.results if r.status is Status.SKIPPED and (r.mandatory or r.waiver)]

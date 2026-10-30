@@ -8,6 +8,7 @@ from typing import Any
 
 from qgate.models import GateResult
 from qgate.report import json_report
+from qgate.report.grouping import SEVERITIES, group_findings
 
 _CSS = """
 :root{--bg:#f7f8fa;--fg:#1d2330;--card:#fff;--muted:#5d6675;--line:#d9dde4;
@@ -30,7 +31,7 @@ h2{font-size:17px;margin:28px 0 8px;border-bottom:1px solid var(--line);padding-
 th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{background:var(--bg)}.wrap{overflow-x:auto}
 .s{font-weight:700}.s-PASS{color:var(--pass)}.s-FAIL{color:var(--fail)}.s-WARN{color:var(--warn)}
-.s-SKIPPED{color:var(--skip)}.s-ERROR{color:var(--err)}.pos{color:var(--pass)}.neg{color:var(--fail)}
+.s-SKIPPED{color:var(--skip)}.s-ERROR{color:var(--err)}.s-INFO{color:var(--muted)}.pos{color:var(--pass)}.neg{color:var(--fail)}
 .sev{font-weight:600}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0}
 select,button{font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:6px;
 background:var(--card);color:var(--fg)}
@@ -46,9 +47,10 @@ var dark=d?d==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
 r.setAttribute('data-theme',dark?'light':'dark');});
 var fs=document.getElementById('fsev'),ft=document.getElementById('ftool'),fx=document.getElementById('fsup');
 function apply(){var rows=document.querySelectorAll('#findings tbody tr'),n=0;
-rows.forEach(function(tr){var ok=(!fs.value||tr.dataset.sev===fs.value)&&(!ft.value||tr.dataset.tool===ft.value)
+rows.forEach(function(tr){var ok=(!fs.value||tr.dataset.sev===fs.value)
+&&(!ft.value||tr.dataset.tools.indexOf(' '+ft.value+' ')>=0)
 &&(fx.value!=='active'||tr.dataset.sup==='0');tr.style.display=ok?'':'none';if(ok)n++;});
-document.getElementById('fcount').textContent=n+' hallazgos visibles';}
+document.getElementById('fcount').textContent=n+' grupos visibles';}
 [fs,ft,fx].forEach(function(e){e.addEventListener('change',apply);});apply();})();
 """
 
@@ -113,27 +115,31 @@ def _checks(data: dict[str, Any]) -> str:
 
 def _findings(data: dict[str, Any]) -> str:
     items = [f for c in data["checks"] for f in c["findings"]]
+    groups = group_findings(items)
     tools = sorted({f["tool"] for f in items})
-    sevs = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
     rows = []
-    for f in sorted(items, key=lambda x: (sevs.index(x["severity"]), x["tool"], x["file"], x["line"])):
-        supp = bool(f["suppressed_by"])
-        sup = f"<div class='muted'>Excepción: {_e(f['suppressed_by'])}</div>" if supp else ""
+    for g in groups:
+        sup = "<div class='muted'>Con excepción vigente</div>" if g.suppressed else ""
+        place = f"{_e(g.file)}:{_e(g.line)}" if g.file else "—"
         rows.append(
-            f"<tr data-sev='{_e(f['severity'])}' data-tool='{_e(f['tool'])}' data-sup='{int(supp)}'"
-            f"{' class=supp' if supp else ''}><td class='sev'>{_e(f['severity'])}</td><td>{_e(f['tool'])}</td>"
-            f"<td>{_e(f['rule'])}</td><td>{_e(f['file'])}:{_e(f['line'])}</td><td>{_e(f['cwe'])}</td>"
-            f"<td>{_e(f['message'])}{sup}</td></tr>"
+            f"<tr data-sev='{_e(g.severity)}' data-tools=' {_e(' '.join(g.tools))} ' data-sup='{int(g.suppressed)}'"
+            f"{' class=supp' if g.suppressed else ''}><td class='sev'>{_e(g.severity)}</td><td>{place}</td>"
+            f"<td>{_e(g.cwe)}</td><td>{_e(g.message)}{sup}</td>"
+            f"<td>Detectado por: {_e(g.detected_by)}</td></tr>"
         )
-    sev_opts = "".join(f"<option>{s}</option>" for s in sevs)
+    sev_opts = "".join(f"<option>{s}</option>" for s in SEVERITIES)
     tool_opts = "".join(f"<option>{_e(t)}</option>" for t in tools)
+    summary = (
+        f"<p class='muted'>{len(items)} hallazgos agrupados en {len(groups)} por archivo + línea + CWE/regla "
+        "equivalente. La lista completa está en report.json y results.sarif.</p>"
+    )
     return (
-        "<div class='toolbar'><label>Severidad <select id='fsev'><option value=''>Todas</option>"
+        summary + "<div class='toolbar'><label>Severidad <select id='fsev'><option value=''>Todas</option>"
         f"{sev_opts}</select></label><label>Herramienta <select id='ftool'><option value=''>Todas</option>{tool_opts}"
         "</select></label><label>Mostrar <select id='fsup'><option value='all'>Todos</option>"
         "<option value='active'>Solo activos</option></select></label><span id='fcount' class='muted'></span></div>"
-        "<div class='wrap'><table id='findings'><thead><tr><th>Severidad</th><th>Herramienta</th><th>Regla</th>"
-        f"<th>Ubicación</th><th>CWE</th><th>Mensaje</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
+        "<div class='wrap'><table id='findings'><thead><tr><th>Severidad</th><th>Ubicación</th><th>CWE</th>"
+        f"<th>Mensaje</th><th>Herramientas</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
     )
 
 
@@ -151,15 +157,24 @@ def _exceptions(data: dict[str, Any]) -> str:
     )
 
 
+def _omission(check: dict[str, Any]) -> str:
+    waiver = check.get("waiver") or {}
+    if not waiver:
+        return f"<li><b>{_e(check['id'])}</b>: {_e(check['reason'])}</li>"
+    return (
+        f"<li><b>{_e(check['id'])}</b> desactivado — {_e(waiver['justificacion'])} "
+        f"<span class='muted'>(responsable: {_e(waiver['responsable'])}; creada {_e(waiver['creada'])}; "
+        f"vence {_e(waiver['vence'])})</span></li>"
+    )
+
+
 def render(gate: GateResult) -> str:
     data = json_report.build(gate)
     verdict = data["verdict"]
     css_verdict = "OMISIONES" if "OMISIONES" in verdict else verdict
     omissions = data["summary"]["omissions"]
     omitted = (
-        "<ul>"
-        + "".join(f"<li>{_e(c['id'])}: {_e(c['reason'])}</li>" for c in data["checks"] if c["id"] in omissions)
-        + "</ul>"
+        "<ul>" + "".join(_omission(c) for c in data["checks"] if c["id"] in omissions) + "</ul>"
         if omissions else "<p class='muted'>Sin omisiones.</p>"
     )  # fmt: skip
     run, proj, target = data["run"], data["project"], data["python_target"]

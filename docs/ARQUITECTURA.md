@@ -114,6 +114,10 @@ mismo con `qgate run --level standard`).
 }
 ```
 
+Desde 0.1.1 cada check incluye `"waiver"` (vacío o `{check, justificacion, responsable, creada,
+vence}`) y `status` puede valer `"INFO"`. Los mensajes de hallazgos de secretos llegan ya
+enmascarados (`ghp_***`).
+
 Compatibilidad: los campos nuevos se agregan sin cambiar `schema_version` menor; un cambio que
 rompa consumidores incrementa la versión mayor.
 

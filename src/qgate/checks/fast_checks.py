@@ -211,6 +211,8 @@ class PythonVersionCheck(Check):
             if ctx.ci and ctx.target.strict:
                 result.status = Status.FAIL
                 result.reason = message + " [CI con estricto_version=true]"
+            elif ctx.ci:
+                message += " [CI: estricto_version=false en qgate.toml, solo aviso]"
             warn = message
         result.metrics.append(
             Metric("version_python_desalineada", "Desalineación de versión (0 = alineado)",

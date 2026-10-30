@@ -37,6 +37,7 @@ class AstScan:
     findings: list[Finding] = field(default_factory=list)
     trusted_host: bool = False
     texts: str = ""
+    uses_fastapi: bool = False
 
 
 def _name(node: ast.AST) -> str:
@@ -67,6 +68,14 @@ def _docs_exposed(kwargs: dict[str, ast.expr]) -> list[str]:
     return out
 
 
+def _imports_fastapi(node: ast.AST) -> bool:
+    if isinstance(node, ast.Import):
+        return any(alias.name.split(".")[0] in {"fastapi", "starlette"} for alias in node.names)
+    if isinstance(node, ast.ImportFrom):
+        return (node.module or "").split(".")[0] in {"fastapi", "starlette"}
+    return False
+
+
 def scan_file(path: Path, rel: str, scan: AstScan, allow_docs: bool) -> None:
     source = path.read_text(encoding="utf-8", errors="replace")
     scan.texts += source.lower()
@@ -74,6 +83,7 @@ def scan_file(path: Path, rel: str, scan: AstScan, allow_docs: bool) -> None:
         tree = ast.parse(source)
     except SyntaxError:
         return
+    scan.uses_fastapi = scan.uses_fastapi or any(_imports_fastapi(n) for n in ast.walk(tree))
     for node in ast.walk(tree):
         if isinstance(node, ast.Name) and node.id == "TrustedHostMiddleware":
             scan.trusted_host = True
@@ -126,8 +136,8 @@ class FastApiConfigCheck(Check):
         files = list(iter_files(ctx.root, ctx.cfg.src, [".py"], ctx.excludes))
         for path in files:
             scan_file(path, rel_posix(path, ctx.root), scan, allow_docs)
-        if "fastapi" not in scan.texts and not ctx.cfg.app_module:
-            return self.skipped("El proyecto no usa FastAPI.", mandatory=False)
+        if not scan.uses_fastapi and not ctx.cfg.app_module:
+            return self.info("el proyecto no importa FastAPI/Starlette.")
         result = self.new()
         result.findings.extend(scan.findings)
         runtime: dict[str, object] | str = {}

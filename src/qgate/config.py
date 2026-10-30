@@ -127,7 +127,7 @@ class Config:
     python_executable: str
     strict_version: bool
     profile: str
-    disabled: list[str]
+    disabled: list[Any]
     optional: list[str]
     profiles: dict[str, dict[str, Any]]
     raw: dict[str, Any] = field(default_factory=dict)
@@ -187,7 +187,9 @@ def load_config(root: Path) -> Config:
     )
     cfg.src = cfg.str_list("proyecto", "src", _guess_src(root))
     cfg.excludes = cfg.str_list("proyecto", "excluir", [])
-    cfg.disabled = cfg.str_list("checks", "desactivados", [])
+    # strings (legacy, unjustified) or [[checks.desactivados]] tables; validated by qgate.waivers
+    disabled = checks.get("desactivados", [])
+    cfg.disabled = disabled if isinstance(disabled, list) else [disabled]
     cfg.optional = cfg.str_list("checks", "opcionales", [])
     if cfg.profile not in cfg.profiles:
         msg = f"El perfil por defecto '{cfg.profile}' no está definido."

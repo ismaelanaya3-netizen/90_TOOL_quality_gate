@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,8 @@ class RunContext:
     target: TargetPython
     out_dir: Path
     registry: ExceptionRegistry
+    # raw secret values seen during the run; masked in every output (see qgate.redact)
+    secrets: set[str] = field(default_factory=set)
 
     @property
     def root(self) -> Path:

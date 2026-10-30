@@ -14,8 +14,16 @@ estricto_version = true           # desalineación: true = FAIL en CI y WARN en 
 
 [checks]
 perfil = "strict"
-desactivados = []                 # ids de checks a no ejecutar (quedan visibles como omitidos no obligatorios)
 opcionales = []                   # ids cuyo SKIPPED no se convierte en FAIL en CI
+
+# Desactivar un check exige el mismo rigor que una excepción. Aparece en "Omisiones" y el
+# veredicto pasa a APROBADO CON OMISIONES. Sin justificación -> FAIL; vencido -> se ejecuta.
+# [[checks.desactivados]]
+# check = "dast_zap"
+# justificacion = "Los agentes Windows no tienen Docker; ZAP corre en la etapa DeepScan Linux."
+# responsable = "Nombre Apellido"
+# creada = 2026-10-30
+# vence = 2027-01-28
 
 [cobertura]
 criticos = ["@@SRC@@/auth*.py", "@@SRC@@/security*.py", "@@SRC@@/db*.py", "@@SRC@@/repositor*.py"]

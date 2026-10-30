@@ -93,9 +93,25 @@ Código de salida: `0` aprobado (con o sin omisiones), `1` rechazado, `2` error 
 | 17 | `dast_zap` | OWASP ZAP baseline (Docker) | full | 0 alertas High/Medium |
 | 18 | `load_smoke` | locust headless 30 s × 20 usuarios | full | p95 < 800 ms, 0 % errores |
 
-Si un check no puede ejecutarse (sin red, sin Docker, sin herramienta) queda **SKIPPED** con su
-motivo: en local el veredicto es **APROBADO CON OMISIONES**; en CI (`--ci`, `QGATE_CI=1`,
-`TF_BUILD`, `GITHUB_ACTIONS`) un check obligatorio omitido es **FAIL**.
+Estados: `PASS`, `FAIL`, `WARN`, `ERROR`, `SKIPPED` e `INFO`. `INFO` significa "sin elementos que
+verificar" (por ejemplo, `licenses` sin dependencias de runtime o los checks de app en un proyecto
+sin FastAPI) y no bloquea. Si un check no puede ejecutarse (sin red, sin Docker, sin herramienta)
+queda **SKIPPED** con su motivo: en local el veredicto es **APROBADO CON OMISIONES**; en CI (`--ci`,
+`QGATE_CI=1`, `TF_BUILD`, `GITHUB_ACTIONS`) un check obligatorio omitido es **FAIL**.
+
+### Desactivar un check
+
+Solo con justificación auditable, igual que una excepción. Queda listado en "Omisiones" y el
+veredicto pasa a APROBADO CON OMISIONES. Sin justificación → FAIL; vencido → el check se ejecuta.
+
+```toml
+[[checks.desactivados]]
+check = "dast_zap"
+justificacion = "Los agentes Windows no tienen Docker; ZAP corre en la etapa DeepScan Linux."
+responsable = "Nombre Apellido"
+creada = 2026-10-30
+vence = 2027-01-28
+```
 
 ## Python objetivo configurable
 
@@ -115,7 +131,7 @@ pip-licenses y la app levantada en los checks full.
 
 | Archivo | Uso |
 |---|---|
-| `report.html` | Evidencia para auditoría: veredicto, checks, **márgenes** vs baseline/strict, hallazgos filtrables, excepciones y omisiones. Abre offline; imprimible a PDF. |
+| `report.html` | Evidencia para auditoría: veredicto, checks, **márgenes** vs baseline/strict, hallazgos agrupados (archivo + línea + CWE, "Detectado por: …") y filtrables, excepciones y omisiones. Abre offline; imprimible a PDF. |
 | `report.json` | Esquema estable (`schema_version`), ver `docs/ARQUITECTURA.md`. |
 | `results.sarif` | SARIF 2.1.0 consolidado (Azure *Scans* tab / GitHub code scanning). |
 | `junit.xml`, `coverage.xml` | Para `PublishTestResults@2` y `PublishCodeCoverageResults@2`. |
@@ -124,6 +140,8 @@ pip-licenses y la app levantada en los checks full.
 
 **Margen**: para cada métrica se muestra el valor, el umbral de cada perfil y la distancia. Por
 ejemplo, cobertura 91 % frente a 70 % baseline → **+21 pts**; positivo = se supera lo exigido.
+
+Los secretos se enmascaran en todas las salidas (4 primeros caracteres + `***`).
 
 ## Excepciones
 

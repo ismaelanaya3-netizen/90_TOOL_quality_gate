@@ -14,6 +14,7 @@ _COLORS = {
     Status.WARN: "33",
     Status.SKIPPED: "36",
     Status.ERROR: "35",
+    Status.INFO: "37",
 }
 _VERDICT_COLORS = {Verdict.APPROVED: "32", Verdict.APPROVED_WITH_OMISSIONS: "33", Verdict.REJECTED: "31"}
 

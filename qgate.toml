@@ -12,14 +12,18 @@ excluir = ["examples/**"]
 # El kit soporta Python >= 3.10: se tipa y se analiza contra la mínima soportada.
 python_objetivo = "3.10"
 python_ejecutable = ""
-# Librería multi-versión: la desalineación del intérprete solo avisa (la matriz de CI ejecuta
-# 3.10 y 3.12; ruff y mypy validan siempre contra la mínima soportada).
+# DECISIÓN DELIBERADA: el kit es una librería multiversión (Python 3.10–3.12+). ruff, mypy y
+# vermin validan siempre contra la mínima soportada (3.10), pero la matriz de CI ejecuta el
+# gate con 3.10 y con 3.12. Con estricto_version = true el job 3.12 fallaría por diseño, así que
+# la desalineación del intérprete solo avisa (WARN), también con --ci. Los proyectos de
+# aplicación (dashboards) deben usar estricto_version = true. Cubierto por
+# tests/test_v011.py::test_kit_config_warns_in_ci_by_design.
 estricto_version = false
 
 [checks]
 perfil = "strict"
-# El kit no es una aplicación FastAPI: los checks de app no aplican.
-desactivados = ["fastapi_config", "api_props", "http_behavior", "dast_zap", "load_smoke"]
+# Sin desactivaciones: los checks de app (fastapi_config y los de nivel full) detectan que el
+# kit no es una aplicación FastAPI y devuelven INFO "sin elementos que verificar".
 
 [perfiles.strict]
 # Regla del propio kit: ningún .py supera 400 líneas.

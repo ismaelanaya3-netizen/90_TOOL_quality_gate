@@ -99,9 +99,9 @@ def _parse_date(value: Any, where: str) -> dt.date:
         raise ConfigError(msg) from exc
 
 
-def parse_exception(entry: dict[str, Any], index: int) -> GateException:
-    where = f"{EXCEPTIONS_FILE} excepción #{index}"
-    for key in ("regla", "justificacion", "responsable", "creada", "vence"):
+def validate_record(entry: dict[str, Any], where: str, keys: tuple[str, ...]) -> tuple[dt.date, dt.date]:
+    """Common audit rules: mandatory fields, ISO dates, max validity, real justification."""
+    for key in keys:
         if not str(entry.get(key, "")).strip():
             msg = f"{where}: falta el campo obligatorio '{key}'."
             raise ConfigError(msg)
@@ -116,6 +116,12 @@ def parse_exception(entry: dict[str, Any], index: int) -> GateException:
     if len(str(entry["justificacion"]).strip()) < 15:
         msg = f"{where}: la justificación debe explicar el motivo (mínimo 15 caracteres)."
         raise ConfigError(msg)
+    return created, expires
+
+
+def parse_exception(entry: dict[str, Any], index: int) -> GateException:
+    where = f"{EXCEPTIONS_FILE} excepción #{index}"
+    created, expires = validate_record(entry, where, ("regla", "justificacion", "responsable", "creada", "vence"))
     return GateException(
         rule=str(entry["regla"]),
         path=str(entry.get("archivo", "**")),

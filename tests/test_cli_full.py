@@ -81,7 +81,8 @@ def test_full_checks_detect_insecure_app(tmp_path: Path) -> None:
 def test_full_checks_skip_without_app(tmp_path: Path) -> None:
     write_project(tmp_path, files={"app/a.py": "x = 1\n"})
     gate = run_gate(tmp_path, level=Level.FULL, only=["api_props", "http_behavior", "dast_zap", "load_smoke"], ci=True)
-    assert all(r.status is Status.SKIPPED and not r.mandatory for r in gate.results)
+    assert all(r.status is Status.INFO and not r.mandatory for r in gate.results)
+    assert all(r.reason.startswith("Sin elementos que verificar") for r in gate.results)
     assert gate.verdict is Verdict.APPROVED
 
 

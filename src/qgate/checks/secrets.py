@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
 from qgate import tools
@@ -11,6 +12,9 @@ from qgate.checks.base import Check
 from qgate.context import RunContext
 from qgate.fsutil import glob_to_regex, matches_any, rel_posix
 from qgate.models import CheckResult, Finding, Level, Severity
+from qgate.redact import mask
+
+_GITLEAKS_PLACEHOLDER = "REDACTED"
 
 
 def secret_excludes(ctx: RunContext) -> list[str]:
@@ -36,25 +40,37 @@ class SecretsCheck(Check):
     gate_key = "secretos"
 
     def run_gitleaks(self, ctx: RunContext, binary: str, result: CheckResult) -> bool:
-        report = ctx.out_dir / "gitleaks-report.json"
-        args = [
-            binary, "dir", ".", "--config", str(gitleaks_config(ctx)),
-            "--report-format", "json", "--report-path", str(report),
-            "--no-banner", "--redact", "--exit-code", "0",
-        ]  # fmt: skip
-        out = tools.run(args, cwd=ctx.root, timeout=900)
-        if not out.ok or not report.is_file():
-            result.notes.append(f"gitleaks falló: {out.stderr.strip()[:300]}")
-            return False
+        # The raw report holds full secrets: it lives in a temp dir outside .qgate/ and is deleted.
+        with tempfile.TemporaryDirectory(prefix="qgate-gitleaks-") as tmp:
+            report = Path(tmp) / "gitleaks-report.json"
+            args = [
+                binary, "dir", ".", "--config", str(gitleaks_config(ctx)),
+                "--report-format", "json", "--report-path", str(report),
+                "--no-banner", "--exit-code", "0",
+            ]  # fmt: skip
+            out = tools.run(args, cwd=ctx.root, timeout=900)
+            if not out.ok or not report.is_file():
+                result.notes.append(f"gitleaks falló: {out.stderr.strip()[:300]}")
+                return False
+            items = json.loads(report.read_text(encoding="utf-8") or "[]")
+        masked = [
+            {**i, "Secret": mask(str(i.get("Secret", ""))), "Match": mask(str(i.get("Match", "")))} for i in items
+        ]
+        (ctx.out_dir / "gitleaks-report.json").write_text(json.dumps(masked, indent=2), encoding="utf-8")
         result.tool_version = gitleaks_bin.GITLEAKS_VERSION
         excludes = secret_excludes(ctx)
-        for item in json.loads(report.read_text(encoding="utf-8") or "[]"):
+        for item in items:
             rel = str(item.get("File", "")).replace("\\", "/").removeprefix("./")
             if matches_any(rel, excludes):
                 continue
+            value = str(item.get("Secret", ""))
+            known = value not in {"", _GITLEAKS_PLACEHOLDER}
+            if known:
+                ctx.secrets.add(value)
+            shown = f" (valor: '{value}')" if known else ""
             result.findings.append(
                 Finding("gitleaks", str(item.get("RuleID", "secret")), Severity.HIGH,
-                        str(item.get("Description", "Posible secreto")), rel,
+                        str(item.get("Description", "Posible secreto")) + shown, rel,
                         int(item.get("StartLine", 0)), cwe="CWE-798")
             )  # fmt: skip
         return True

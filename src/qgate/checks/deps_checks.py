@@ -158,10 +158,9 @@ class LicensesCheck(Check):
     def execute(self, ctx: RunContext) -> CheckResult:
         reqs = [r for f in requirement_files(ctx, "licencias") for r in parse_requirements(f, ctx.root)]
         names = sorted({r.name for r in reqs if r.spec != "editable"})
-        result = self.new()
         if not names:
-            result.notes.append("Sin dependencias de runtime declaradas.")
-            return self.finalize(ctx, result)
+            return self.info("no hay dependencias de runtime declaradas.")
+        result = self.new()
         if not tools.module_available("piplicenses"):
             return self.skipped("pip-licenses no está instalado.")
         result.tool_version = tools.version_of([*tools.python_module_cmd("piplicenses"), "--version"])

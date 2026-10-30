@@ -76,13 +76,18 @@ def test_verdicts() -> None:
 
 
 def test_disabled_and_profile_not_required(tmp_path: Path) -> None:
-    write_project(tmp_path, '[proyecto]\nsrc = ["app"]\n[checks]\ndesactivados = ["lint"]\n', {"app/a.py": "x = 1\n"})
+    toml = (
+        '[proyecto]\nsrc = ["app"]\n[[checks.desactivados]]\ncheck = "lint"\n'
+        'justificacion = "Código heredado en migración, ver ticket DASH-12."\nresponsable = "Equipo"\n'
+        "creada = 2026-10-01\nvence = 2099-01-01\n"
+    )
+    write_project(tmp_path, toml.replace("2099-01-01", "2027-01-01"), {"app/a.py": "x = 1\n"})
     gate = run_gate(tmp_path, level=Level.STANDARD, only=["lint", "typing"], profile="baseline", ci=True)
     by_id = {r.check_id: r for r in gate.results}
     assert by_id["lint"].status is Status.SKIPPED
     assert by_id["typing"].status is Status.SKIPPED
     assert not by_id["typing"].mandatory
-    assert gate.verdict is Verdict.APPROVED
+    assert gate.verdict is Verdict.APPROVED_WITH_OMISSIONS  # justified deactivation is an omission
     with pytest.raises(ConfigError, match="Perfil desconocido"):
         run_gate(tmp_path, profile="nope")
 

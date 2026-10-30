@@ -45,6 +45,12 @@ class Check(ABC):
         result.mandatory = mandatory
         return result
 
+    def info(self, reason: str) -> CheckResult:
+        """Nothing to verify (e.g. no runtime dependencies, no FastAPI app): informative only."""
+        result = self.new(Status.INFO, f"Sin elementos que verificar: {reason}")
+        result.mandatory = False
+        return result
+
     def error(self, reason: str) -> CheckResult:
         return self.new(Status.ERROR, reason)
 

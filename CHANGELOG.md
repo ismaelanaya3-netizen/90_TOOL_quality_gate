@@ -2,6 +2,37 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y versionado semántico.
 
+## [0.1.1] - 2026-10-30
+
+### Cambiado
+- **Desactivar un check exige justificación** con el mismo modelo que `qgate-exceptions.toml`:
+  `[[checks.desactivados]]` con `check`, `justificacion`, `responsable`, `creada` y `vence`
+  (≤ 180 días). Un check desactivado aparece en "Omisiones" y el veredicto pasa a
+  **APROBADO CON OMISIONES**; no se convierte en FAIL con `--ci` porque está autorizado. Si no
+  hay justificación (incluido el formato anterior `desactivados = ["id"]`) o el registro es
+  inválido, el check da **FAIL**. Si la desactivación venció, el check se vuelve a ejecutar.
+- **Nuevo estado `INFO`** ("Sin elementos que verificar") en lugar de PASS cuando un check no
+  tiene nada que revisar: `licenses` sin dependencias de runtime, `fastapi_config` en proyectos
+  que no importan FastAPI/Starlette (detección por import AST, ya no por texto) y los checks
+  `full` sin `app_module`. INFO no bloquea, no es una omisión y aparece en JUnit como `system-out`.
+- **Informe HTML**: los hallazgos se agrupan por archivo + línea + CWE o regla equivalente (ruff
+  `S###` = bandit `B###`; reglas `qgate-*` de semgrep mapeadas a su equivalente bandit) y
+  muestran "Detectado por: …". `report.json` y `results.sarif` conservan la lista completa y los
+  conteos por check no cambian.
+- El kit ya no usa `desactivados`: sus checks de app no aplicables dan INFO.
+- Se documenta en el `qgate.toml` del kit por qué usa `estricto_version = false` (librería
+  multiversión) y el motivo del WARN en CI lo dice explícitamente. Con `estricto_version = true`
+  y `--ci`, la desalineación sigue siendo FAIL (ambos casos probados).
+
+### Seguridad
+- **Enmascarado de secretos en todas las salidas** (consola, `report.json`, `report.html`,
+  `results.sarif`, `qgate-junit.xml`): los valores reportados por gitleaks, detect-secrets,
+  bandit B105/B106/B107 y ruff S105–S107 se muestran como los 4 primeros caracteres + `***`, y
+  cualquier repetición del valor en otros mensajes o notas también se enmascara. En 0.1.0 el
+  mensaje de bandit B105 exponía el token completo del fixture en 4 archivos de `.qgate/`.
+- El informe crudo de gitleaks se escribe en una carpeta temporal fuera de `.qgate/` y se borra;
+  en `.qgate/` solo queda `gitleaks-report.json` enmascarado.
+
 ## [0.1.0] - 2026-10-30
 
 ### Añadido

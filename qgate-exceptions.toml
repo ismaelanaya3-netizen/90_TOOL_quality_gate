@@ -1,0 +1,20 @@
+# Registro auditable de excepciones del propio kit.
+# Vigencia máxima 180 días. Al vencer, el hallazgo vuelve a contar y el gate falla.
+
+[[excepcion]]
+regla = ["CVE-2026-59951", "CVE-2026-116684", "CVE-2026-116685", "CVE-2026-116686"]
+herramienta = "pip-audit"
+archivo = "requirements-dev.lock"
+justificacion = "mcp==1.29.0 llega como dependencia fijada exactamente por semgrep 1.183.0 (herramienta de desarrollo, no runtime). qgate no levanta el servidor MCP de semgrep. Actualizar cuando semgrep libere la restricción."
+responsable = "Ismael Anaya"
+creada = 2026-10-30
+vence = 2027-01-28
+
+[[excepcion]]
+regla = "CVE-2026-114603"
+herramienta = "pip-audit"
+archivo = "requirements-dev.lock"
+justificacion = "opentelemetry-api==1.37.0 es fijado por semgrep 1.183.0 (~=1.37.0); la telemetría está desactivada (--metrics=off). Herramienta de desarrollo, no runtime."
+responsable = "Ismael Anaya"
+creada = 2026-10-30
+vence = 2027-01-28

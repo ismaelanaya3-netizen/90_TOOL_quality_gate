@@ -1,0 +1,43 @@
+# Configuración del gate para el propio kit (autoverificación).
+
+[proyecto]
+nombre = "qgate"
+src = ["src/qgate"]
+pruebas = "tests"
+app_module = ""
+# Los ejemplos tienen su propio qgate.toml y se verifican por separado.
+excluir = ["examples/**"]
+
+[entorno]
+# El kit soporta Python >= 3.10: se tipa y se analiza contra la mínima soportada.
+python_objetivo = "3.10"
+python_ejecutable = ""
+# Librería multi-versión: la desalineación del intérprete solo avisa. En CI la matriz fija
+# QGATE_PYTHON_OBJETIVO con la versión de cada job.
+estricto_version = false
+
+[checks]
+perfil = "strict"
+# El kit no es una aplicación FastAPI: los checks de app no aplican.
+desactivados = ["fastapi_config", "api_props", "http_behavior", "dast_zap", "load_smoke"]
+
+[perfiles.strict]
+# Regla del propio kit: ningún .py supera 400 líneas.
+archivo_lineas_max = 400
+archivo_lineas_aviso = 350
+
+[cobertura]
+criticos = ["src/qgate/exceptions_registry.py", "src/qgate/pyversion.py", "src/qgate/tools.py"]
+
+[dependencias]
+archivos = ["requirements-dev.lock"]
+# El lock ya contiene el árbol completo (pip freeze): no hace falta resolver.
+auditar_transitivas = false
+
+[licencias]
+# Dependencias de runtime del kit: ninguna (solo stdlib; tomli en Python 3.10).
+archivos = []
+
+[secretos]
+# Fixtures deliberadamente inseguros (incluye un token FALSO): excluidos del escaneo del kit.
+excluir = ["examples/vulnerable_fixtures/**"]
